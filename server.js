@@ -102,7 +102,7 @@ app.use('/api/delivery-challans', deliveryChallanRoutes);
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'Billing API is running. DigistriveMedia.com' });
+  res.json({ message: 'Billing API is running. Welcome to DigistriveMedia.com' });
 });
 
 // Global error handler
