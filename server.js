@@ -64,7 +64,8 @@ const corsOptions = {
     // Allow requests with no origin (mobile apps, curl, server-to-server health checks)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: Origin ${origin} is not allowed.`));
+    // Return false (not an Error) so cors sends a 403, not a 500
+    callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
