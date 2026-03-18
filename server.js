@@ -22,6 +22,7 @@ import reportsRoutes from './routes/reportsRoutes.js';
 import quotationRoutes from './routes/quotationRoutes.js';
 import proformaRoutes from './routes/proformaRoutes.js';
 import deliveryChallanRoutes from './routes/deliveryChallanRoutes.js';
+import serviceRoutes from './routes/serviceRoutes.js';
 
 // Import Counter model to register it with Mongoose
 import './models/Counter.js';
@@ -79,6 +80,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/quotations', quotationRoutes);
 app.use('/api/proforma-invoices', proformaRoutes);
 app.use('/api/delivery-challans', deliveryChallanRoutes);
+app.use('/api/services', serviceRoutes);
 
 // Health check
 app.get('/', (req, res) => {
