@@ -100,6 +100,8 @@ const shopSettingsSchema = new mongoose.Schema({
   // --- Invoice Item / Section Toggles ---
   enableProduct: { type: Boolean, default: true },
   enableService: { type: Boolean, default: false },
+  invBatchNumber: { type: Boolean, default: false },
+  invExpiryDate: { type: Boolean, default: false },
   enableTransport: { type: Boolean, default: false },
   enablePurchaseOrders: { type: Boolean, default: false },
   enableAdditionalDetails: { type: Boolean, default: false },

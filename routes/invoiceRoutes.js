@@ -315,7 +315,12 @@ router.post('/', async (req, res) => {
         }, taxType, 'invoice');
 
         // Register deduction — applied atomically inside the transaction
-        batchDeductions.push({ batchId: batch._id, quantity: item.quantity });
+        batchDeductions.push({
+          batchId: batch._id,
+          quantity: item.quantity,
+          productId: product._id,
+          serialNumber: item.serialNumber || null // Track serial if provided
+        });
 
         processedItems.push({
           itemType: 'product',
@@ -324,6 +329,7 @@ router.post('/', async (req, res) => {
           batch: batch._id,
           batchNo: batch.batchNo,
           expiryDate: batch.expiryDate,
+          serialNumber: item.serialNumber || null, // Include serial number
           hsnCode: product.hsnCode,
           quantity: item.quantity,
           unit: product.unit,
@@ -387,9 +393,18 @@ router.post('/', async (req, res) => {
     session = await Invoice.startSession();
     session.startTransaction();
 
-    // Step 1: Deduct batch stock
+    // Step 1: Deduct batch stock and mark serial numbers as sold
     for (const d of batchDeductions) {
       await deductBatchStock(d.batchId, d.quantity, session);
+
+      // If this item has a serial number, mark it as sold
+      if (d.serialNumber && d.productId) {
+        await Product.findByIdAndUpdate(
+          d.productId,
+          { $addToSet: { soldSerialNumbers: d.serialNumber } },
+          { session }
+        );
+      }
     }
 
     // Step 2: Create invoice document

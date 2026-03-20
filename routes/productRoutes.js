@@ -86,7 +86,51 @@ router.get('/batches-for-invoice', async (req, res) => {
         label: `${batch.product.name} - ₹${batch.sellingPrice} (Batch: ${batch.batchNo || 'N/A'}, Stock: ${batch.quantity}${batch.expiryDate ? `, Exp: ${new Date(batch.expiryDate).toLocaleDateString('en-GB')}` : ''})`
       }));
 
-    // 2. Non-inventory products (trackInventory: false) — always show, no batch needed
+    // 2. Products with serial numbers — return as grouped product with available serials
+    const productsWithSerials = await Product.find(
+      addOrgFilter(req, {
+        isActive: true,
+        serialNumbers: { $exists: true, $ne: [] }
+      })
+    ).lean();
+
+    const serialProductOptions = [];
+    for (const product of productsWithSerials) {
+      // Get available (unsold) serial numbers
+      const availableSerials = (product.serialNumbers || []).filter(
+        sn => !(product.soldSerialNumbers || []).includes(sn)
+      );
+
+      // Only show product if it has available serials
+      if (availableSerials.length > 0) {
+        // Try to find the batch for this product
+        const productBatch = await Batch.findOne({
+          product: product._id,
+          organizationId: req.organizationId,
+          isActive: true
+        }).lean();
+
+        serialProductOptions.push({
+          batchId: productBatch?._id || null,
+          productId: product._id,
+          productName: product.name,
+          batchNo: productBatch?.batchNo || null,
+          sellingPrice: productBatch?.sellingPrice || product.sellingPrice,
+          mrp: productBatch?.mrp || product.mrp,
+          gstRate: productBatch?.gstRate || product.gstRate,
+          availableQuantity: availableSerials.length, // Total available serials
+          availableSerials: availableSerials, // Array of available serial numbers
+          expiryDate: productBatch?.expiryDate || null,
+          unit: product.unit,
+          hsnCode: product.hsnCode,
+          trackInventory: true,
+          hasSerial: true,
+          label: `${product.name} - ₹${productBatch?.sellingPrice || product.sellingPrice} (${availableSerials.length} available)`
+        });
+      }
+    }
+
+    // 3. Non-inventory products (trackInventory: false) — always show, no batch needed
     const nonInventoryProducts = await Product.find(
       addOrgFilter(req, { isActive: true, trackInventory: false })
     ).lean();
@@ -107,7 +151,7 @@ router.get('/batches-for-invoice', async (req, res) => {
       label: `${product.name} - ₹${product.sellingPrice} (No stock tracking)`
     }));
 
-    res.json([...batchOptions, ...nonInventoryOptions]);
+    res.json([...batchOptions, ...serialProductOptions, ...nonInventoryOptions]);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

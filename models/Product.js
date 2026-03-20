@@ -16,6 +16,26 @@ const productSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  itemStatus: {
+    type: String,
+    enum: ['TRADING', 'RAW_MATERIAL', 'FINISHED', 'SEMI', 'CONSUMABLE'],
+    default: 'TRADING'
+  },
+  category: {
+    type: String,
+    trim: true
+  },
+  serialNumbers: {
+    type: [String],
+    default: []
+  },
+  soldSerialNumbers: {
+    type: [String],
+    default: []
+  },
+  manufactureDate: {
+    type: Date
+  },
   genericName: {
     type: String,
     trim: true
@@ -46,7 +66,7 @@ const productSchema = new mongoose.Schema({
   },
   mrp: {
     type: Number,
-    required: true
+    required: false
   },
   sellingPrice: {
     type: Number,
@@ -54,7 +74,7 @@ const productSchema = new mongoose.Schema({
   },
   purchasePrice: {
     type: Number,
-    required: true
+    required: false
   },
   stockQuantity: {
     type: Number,

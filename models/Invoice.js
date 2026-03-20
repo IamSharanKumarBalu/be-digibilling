@@ -14,6 +14,7 @@ const invoiceItemSchema = new mongoose.Schema({
   },
   batchNo: String,
   expiryDate: Date,
+  serialNumber: String, // For products with serial/IMEI tracking
   hsnCode: String,
   quantity: {
     type: Number,
