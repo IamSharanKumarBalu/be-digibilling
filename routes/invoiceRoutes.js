@@ -18,33 +18,105 @@ router.use(protect);
 router.use(tenantIsolation);
 
 // @route   GET /api/invoices
-// @desc    Get all invoices
+// @desc    Get all invoices with pagination, search, and filters
 // @access  Private
 router.get('/', async (req, res) => {
   try {
-    const { startDate, endDate, paymentStatus, customer } = req.query;
-    let query = addOrgFilter(req); // Use organizationId filter
+    const {
+      startDate,
+      endDate,
+      paymentStatus,
+      customer,
+      search,
+      invoiceType,
+      minAmount,
+      maxAmount,
+      page = 1,
+      limit = 15,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
 
+    // Build base query with organization filter
+    const baseQuery = addOrgFilter(req);
+    let query = { ...baseQuery };
+    const additionalFilters = {};
+
+    // Date range filter
     if (startDate && endDate) {
-      query.invoiceDate = {
+      additionalFilters.invoiceDate = {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
     }
 
+    // Payment status filter
     if (paymentStatus) {
-      query.paymentStatus = paymentStatus;
+      additionalFilters.paymentStatus = paymentStatus;
     }
 
+    // Customer filter
     if (customer) {
-      query.customer = customer;
+      additionalFilters.customer = customer;
     }
 
+    // Invoice type filter
+    if (invoiceType) {
+      additionalFilters.invoiceType = invoiceType;
+    }
+
+    // Amount range filter
+    if (minAmount || maxAmount) {
+      additionalFilters.grandTotal = {};
+      if (minAmount) additionalFilters.grandTotal.$gte = parseFloat(minAmount);
+      if (maxAmount) additionalFilters.grandTotal.$lte = parseFloat(maxAmount);
+    }
+
+    // Apply additional filters to query
+    query = { ...query, ...additionalFilters };
+
+    // Search filter (invoice number, customer name, customer phone)
+    if (search && search.trim() !== '') {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { invoiceNumber: searchRegex },
+        { customerName: searchRegex },
+        { customerPhone: searchRegex }
+      ];
+    }
+
+    // Calculate pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const totalInvoices = await Invoice.countDocuments(query);
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Fetch invoices with pagination
     const invoices = await Invoice.find(query)
       .populate('customer', 'name phone')
-      .sort({ createdAt: -1 });
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
 
-    res.json(invoices);
+    // Send response with pagination metadata
+    res.json({
+      invoices,
+      pagination: {
+        total: totalInvoices,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalInvoices / limitNum),
+        hasNextPage: pageNum < Math.ceil(totalInvoices / limitNum),
+        hasPrevPage: pageNum > 1
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
