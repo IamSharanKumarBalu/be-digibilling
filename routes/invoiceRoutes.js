@@ -10,10 +10,55 @@ import { calculateItemGST, calculateTotals, determineTaxType } from '../utils/gs
 import { getBatchesForSale, deductBatchStock, addBatchStock, calculateCOGS } from '../utils/inventoryManager.js';
 import { postSalesToLedger } from '../utils/ledgerHelper.js';
 import Ledger from '../models/Ledger.js';
+import { generateInvoicePDF } from '../utils/pdfGenerator.js';
 
 const router = express.Router();
 
-// Apply authentication and tenant isolation to all routes
+// @route   GET /api/invoices/:id/pdf
+// @desc    Get invoice as PDF (Public - No Auth Required)
+// @access  Public
+router.get('/:id/pdf', async (req, res) => {
+  console.log('PDF request received for invoice ID:', req.params.id);
+
+  try {
+    // Find invoice without organization filter (public access)
+    const invoice = await Invoice.findById(req.params.id)
+      .populate('customer')
+      .populate('items.product')
+      .populate('items.batch');
+
+    if (!invoice) {
+      console.error('Invoice not found:', req.params.id);
+      return res.status(404).send('Invoice not found');
+    }
+
+    console.log('Invoice found:', invoice.invoiceNumber);
+
+    // Get shop settings for the invoice's organization
+    const shopSettings = await ShopSettings.findOne({
+      organizationId: invoice.organizationId
+    });
+
+    console.log('Shop settings found:', shopSettings?.shopName);
+
+    // Generate PDF
+    const pdfBuffer = await generateInvoicePDF(invoice, shopSettings);
+
+    // Set headers to display PDF in browser
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Invoice-${invoice.invoiceNumber}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    console.log('Sending PDF response...');
+    // Send as binary buffer, not JSON
+    res.end(pdfBuffer, 'binary');
+  } catch (error) {
+    console.error('PDF route error:', error);
+    res.status(500).send(`Error generating PDF: ${error.message}`);
+  }
+});
+
+// Apply authentication and tenant isolation to all routes AFTER the public PDF route
 router.use(protect);
 router.use(tenantIsolation);
 
