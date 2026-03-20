@@ -15,18 +15,65 @@ router.use(tenantIsolation);
 // IMPORTANT: Specific routes must come BEFORE /:id route to avoid conflicts
 
 // @route   GET /api/products/with-batches
-// @desc    Get all products with their batches (including inactive batches for display)
+// @desc    Get all products with their batches (with pagination, search, filters, sorting)
 // @access  Private
 router.get('/with-batches', async (req, res) => {
   try {
-    const { search } = req.query;
-    let query = addOrgFilter(req, { isActive: true });
+    const {
+      search,
+      itemStatus,
+      category,
+      page = 1,
+      limit = 15,
+      sortBy = 'name',
+      sortOrder = 'asc'
+    } = req.query;
 
-    if (search) {
-      query.$text = { $search: search };
+    // Build base query
+    const baseQuery = addOrgFilter(req, { isActive: true });
+    let query = { ...baseQuery };
+    const additionalFilters = {};
+
+    // Item status filter
+    if (itemStatus) {
+      additionalFilters.itemStatus = itemStatus;
     }
 
-    const products = await Product.find(query).sort({ name: 1 }).lean();
+    // Category filter
+    if (category) {
+      additionalFilters.category = category;
+    }
+
+    // Apply additional filters
+    query = { ...query, ...additionalFilters };
+
+    // Search filter (product name or HSN code)
+    if (search && search.trim() !== '') {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { name: searchRegex },
+        { hsnCode: searchRegex }
+      ];
+    }
+
+    // Calculate pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count
+    const totalProducts = await Product.countDocuments(query);
+
+    // Build sort object
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Fetch products with pagination
+    const products = await Product.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
 
     // For each product, fetch ALL batches (active + inactive) for display
     const productsWithBatches = await Promise.all(
@@ -46,7 +93,18 @@ router.get('/with-batches', async (req, res) => {
       })
     );
 
-    res.json(productsWithBatches);
+    // Send response with pagination metadata
+    res.json({
+      products: productsWithBatches,
+      pagination: {
+        total: totalProducts,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalProducts / limitNum),
+        hasNextPage: pageNum < Math.ceil(totalProducts / limitNum),
+        hasPrevPage: pageNum > 1
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
