@@ -55,6 +55,12 @@ const proformaInvoiceSchema = new mongoose.Schema({
     grandTotal: { type: Number, default: 0 },
     notes: String,
     terms: String,
+    // Set when this proforma invoice is converted to an invoice
+    convertedToInvoiceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Invoice',
+        default: null
+    },
 }, { timestamps: true });
 
 proformaInvoiceSchema.index({ organizationId: 1, proformaDate: -1 });
