@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium';
 
 /**
  * Generate PDF from HTML template
@@ -15,15 +16,30 @@ export async function generateInvoicePDF(invoice, shopSettings, template = 'mode
   let browser;
   try {
     console.log('Launching Puppeteer...');
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
-      ]
-    });
+
+    // Detect if running in serverless environment (Render, AWS Lambda, etc.)
+    const isServerless = process.env.RENDER || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+    if (isServerless) {
+      console.log('Running in serverless environment, using chromium...');
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      });
+    } else {
+      console.log('Running locally, using standard puppeteer...');
+      browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ]
+      });
+    }
 
     console.log('Creating new page...');
     const page = await browser.newPage();
