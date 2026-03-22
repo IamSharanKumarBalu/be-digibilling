@@ -85,6 +85,13 @@ const deliveryChallanSchema = new mongoose.Schema({
     destination: String,
 
     notes: String,
+
+    // Set when this delivery challan is converted to an invoice
+    convertedToInvoiceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Invoice',
+        default: null
+    },
 }, { timestamps: true });
 
 deliveryChallanSchema.index({ organizationId: 1, challanDate: -1 });

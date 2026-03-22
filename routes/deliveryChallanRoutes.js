@@ -175,12 +175,28 @@ router.post('/', async (req, res) => {
 // ── PUT /api/delivery-challans/:id ─────────────────────────────────────────
 router.put('/:id', async (req, res) => {
     try {
-        const { items = [], ...data } = req.body;
+        const { items, ...data } = req.body;
         const existing = await DeliveryChallan.findOne(addOrgFilter(req, { _id: req.params.id }));
         if (!existing) return res.status(404).json({ message: 'Delivery challan not found' });
 
+        // If no items provided, this is a simple field update (e.g., status, convertedToInvoiceId)
+        if (!items || items.length === 0) {
+            const updateFields = {};
+            if (data.status) updateFields.status = data.status;
+            if (data.convertedToInvoiceId) updateFields.convertedToInvoiceId = data.convertedToInvoiceId;
+            if (data.notes !== undefined) updateFields.notes = data.notes;
+
+            const updated = await DeliveryChallan.findByIdAndUpdate(
+                existing._id,
+                { $set: updateFields },
+                { new: true }
+            );
+            return res.json(updated);
+        }
+
+        // Full update with items recalculation
         const taxType = data.taxType || existing.taxType || 'CGST_SGST';
-        const processedItems = items.length > 0 ? processItems(items, taxType) : existing.items;
+        const processedItems = processItems(items, taxType);
         const discountAmt = data.discount !== undefined ? Number(data.discount) : existing.discount;
         const totals = calcTotals(processedItems, taxType, discountAmt);
 
