@@ -290,9 +290,7 @@ function generateModernHTML(invoice, shopSettings) {
         ${(shopSettings?.invoiceTerms || shopSettings?.termsAndConditions) ? `
         <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
           <h3 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 8px;">Terms & Conditions:</h3>
-          <p style="font-size: 12px; color: #4b5563; white-space: pre-line;">
-            ${shopSettings.invoiceTerms || shopSettings.termsAndConditions}
-          </p>
+          <p style="font-size: 12px; color: #4b5563; white-space: pre-wrap; line-height: 1.6;">${shopSettings.invoiceTerms || shopSettings.termsAndConditions}</p>
         </div>
         ` : ''}
 
@@ -683,9 +681,9 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
 
       ${hasTerms ? `
       <!-- Terms & Conditions -->
-      <div style="border: ${B}; padding: 3px 5px; margin-bottom: 4px; font-size: 9px;">
-        <strong>Terms &amp; Conditions: </strong>
-        ${shopSettings.invoiceTerms || shopSettings.termsAndConditions}
+      <div style="border: ${B}; padding: 4px 6px; margin-bottom: 4px; font-size: 9px;">
+        <div style="font-weight: bold; margin-bottom: 3px;">Terms &amp; Conditions:</div>
+        <div style="white-space: pre-wrap; line-height: 1.5;">${shopSettings.invoiceTerms || shopSettings.termsAndConditions}</div>
       </div>
       ` : ''}
 
