@@ -162,12 +162,28 @@ function generateModernHTML(invoice, shopSettings) {
 
         <!-- Customer Details -->
         <div style="margin-bottom: 24px;">
-          <h2 style="font-size: 12px; font-weight: 600; color: #4b5563; text-transform: uppercase; margin-bottom: 8px;">Bill To:</h2>
-          <div style="color: #111827;">
-            <p style="font-weight: 600; font-size: 18px; margin: 0 0 4px 0;">${invoice.customerName}</p>
-            ${invoice.customerPhone ? `<p style="font-size: 14px; margin: 4px 0;">Phone: ${invoice.customerPhone}</p>` : ''}
-            ${invoice.customerAddress ? `<p style="font-size: 14px; margin: 4px 0;">${invoice.customerAddress}</p>` : ''}
-            ${invoice.customerGstin ? `<p style="font-size: 14px; margin: 4px 0;">GSTIN: ${invoice.customerGstin}</p>` : ''}
+          <div style="display: table; width: 100%;">
+            <!-- Bill To -->
+            <div style="display: table-cell; vertical-align: top; ${invoice.shipToName ? 'width: 50%; padding-right: 16px;' : ''}">
+              <h2 style="font-size: 12px; font-weight: 600; color: #4b5563; text-transform: uppercase; margin-bottom: 8px;">Bill To:</h2>
+              <div style="color: #111827;">
+                <p style="font-weight: 600; font-size: 18px; margin: 0 0 4px 0;">${invoice.customerName}</p>
+                ${invoice.customerPhone ? `<p style="font-size: 14px; margin: 4px 0;">Phone: ${invoice.customerPhone}</p>` : ''}
+                ${invoice.customerAddress ? `<p style="font-size: 14px; margin: 4px 0;">${invoice.customerAddress}</p>` : ''}
+                ${invoice.customerGstin ? `<p style="font-size: 14px; margin: 4px 0;">GSTIN: ${invoice.customerGstin}</p>` : ''}
+              </div>
+            </div>
+            ${invoice.shipToName ? `
+            <!-- Ship To -->
+            <div style="display: table-cell; vertical-align: top; width: 50%; padding-left: 16px; border-left: 1px solid #e5e7eb;">
+              <h2 style="font-size: 12px; font-weight: 600; color: #16a34a; text-transform: uppercase; margin-bottom: 8px;">Ship To:</h2>
+              <div style="color: #111827;">
+                <p style="font-weight: 600; font-size: 18px; margin: 0 0 4px 0;">${invoice.shipToName}</p>
+                ${invoice.shipToAddress ? `<p style="font-size: 14px; margin: 4px 0;">${invoice.shipToAddress}</p>` : ''}
+                ${invoice.shipToCity || invoice.shipToState || invoice.shipToPincode ? `<p style="font-size: 14px; margin: 4px 0;">${[invoice.shipToCity, invoice.shipToState, invoice.shipToPincode].filter(Boolean).join(', ')}</p>` : ''}
+              </div>
+            </div>
+            ` : ''}
           </div>
         </div>
 
@@ -466,8 +482,9 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
               <!-- Consignee -->
               <div style="padding: 4px 5px; border-bottom: ${BD};">
                 <div style="font-size: 9px; color: #555; margin-bottom: 1px;">Consignee (Ship to)</div>
-                <div style="font-weight: bold; font-size: 12px;">${invoice.customerName}</div>
-                ${invoice.customerAddress ? `<div style="font-size: 10px;">${invoice.customerAddress}</div>` : ''}
+                <div style="font-weight: bold; font-size: 12px;">${invoice.shipToName || invoice.customerName}</div>
+                ${invoice.shipToAddress || invoice.customerAddress ? `<div style="font-size: 10px;">${invoice.shipToAddress || invoice.customerAddress}</div>` : ''}
+                ${invoice.shipToCity || invoice.shipToState || invoice.shipToPincode ? `<div style="font-size: 10px;">${[invoice.shipToCity, invoice.shipToState, invoice.shipToPincode].filter(Boolean).join(', ')}</div>` : ''}
                 ${invoice.customerPhone ? `<div style="font-size: 10px;">Ph: ${invoice.customerPhone}</div>` : ''}
                 ${invoice.customerGstin ? `
                   <div style="font-size: 10px;">GSTIN/UIN : <strong>${invoice.customerGstin}</strong></div>

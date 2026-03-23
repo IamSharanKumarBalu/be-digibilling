@@ -81,6 +81,12 @@ const invoiceSchema = new mongoose.Schema({
   customerCity: String,
   customerState: String,
   customerGstin: String,
+  // Ship To (separate delivery address)
+  shipToName: String,
+  shipToAddress: String,
+  shipToCity: String,
+  shipToState: String,
+  shipToPincode: String,
   items: [invoiceItemSchema],
   // Prescription tracking for Schedule H/H1/X drugs
   prescriptionRequired: {

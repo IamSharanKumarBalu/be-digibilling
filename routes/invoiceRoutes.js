@@ -530,6 +530,12 @@ router.post('/', async (req, res) => {
       userId: req.user._id,
       organizationId: req.organizationId || req.user.organizationId,
       ...customerData,
+      // Ship To details (separate delivery address)
+      shipToName: invoiceData.shipToName,
+      shipToAddress: invoiceData.shipToAddress,
+      shipToCity: invoiceData.shipToCity,
+      shipToState: invoiceData.shipToState,
+      shipToPincode: invoiceData.shipToPincode,
       items: processedItems,
       ...totals,
       taxType,
