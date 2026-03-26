@@ -1,12 +1,20 @@
 import mongoose from 'mongoose';
 
 const invoiceItemSchema = new mongoose.Schema({
+  itemType: {
+    type: String,
+    enum: ['product', 'service'],
+    default: 'product'
+  },
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     required: false  // false — service items have no product; products still always have one
   },
   productName: String,
+  // Service-specific fields
+  serviceName: String,
+  sacCode: String,
   // Batch tracking for FIFO (optional for backwards compatibility)
   batch: {
     type: mongoose.Schema.Types.ObjectId,
