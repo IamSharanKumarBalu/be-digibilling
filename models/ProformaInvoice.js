@@ -55,6 +55,16 @@ const proformaInvoiceSchema = new mongoose.Schema({
     grandTotal: { type: Number, default: 0 },
     notes: String,
     terms: String,
+    // Purchase Order details
+    poNumber: String,
+    poDate: Date,
+    // Additional invoice details
+    eWayBillNumber: String,
+    deliveryNote: String,
+    referenceNo: String,
+    otherReferences: String,
+    termsOfDelivery: String,
+    destination: String,
     // Set when this proforma invoice is converted to an invoice
     convertedToInvoiceId: {
         type: mongoose.Schema.Types.ObjectId,

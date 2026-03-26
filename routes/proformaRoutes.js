@@ -135,6 +135,16 @@ router.post('/', async (req, res) => {
             ...totals,
             notes: data.notes,
             terms: data.terms,
+            // PO details
+            poNumber: data.poNumber,
+            poDate: data.poDate,
+            // Additional details
+            eWayBillNumber: data.eWayBillNumber,
+            deliveryNote: data.deliveryNote,
+            referenceNo: data.referenceNo,
+            otherReferences: data.otherReferences,
+            termsOfDelivery: data.termsOfDelivery,
+            destination: data.destination,
         });
 
         await doc.save();
@@ -193,6 +203,16 @@ router.put('/:id', async (req, res) => {
                     ...totals,
                     notes: data.notes ?? existing.notes,
                     terms: data.terms ?? existing.terms,
+                    // PO details
+                    poNumber: data.poNumber ?? existing.poNumber,
+                    poDate: data.poDate ?? existing.poDate,
+                    // Additional details
+                    eWayBillNumber: data.eWayBillNumber ?? existing.eWayBillNumber,
+                    deliveryNote: data.deliveryNote ?? existing.deliveryNote,
+                    referenceNo: data.referenceNo ?? existing.referenceNo,
+                    otherReferences: data.otherReferences ?? existing.otherReferences,
+                    termsOfDelivery: data.termsOfDelivery ?? existing.termsOfDelivery,
+                    destination: data.destination ?? existing.destination,
                 }
             },
             { new: true }
