@@ -338,4 +338,99 @@ router.delete('/batches/:id', async (req, res) => {
   }
 });
 
+// @route   GET /api/inventory/top-selling
+// @desc    Get top selling products with filters
+// @access  Private
+router.get('/top-selling', async (req, res) => {
+  try {
+    const { startDate, endDate, limit = 100 } = req.query;
+    const Invoice = (await import('../models/Invoice.js')).default;
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.invoiceDate = {};
+      if (startDate) dateFilter.invoiceDate.$gte = new Date(startDate);
+      if (endDate) dateFilter.invoiceDate.$lte = new Date(endDate);
+    }
+
+    // Aggregate to get top selling products
+    const topSellingProducts = await Invoice.aggregate([
+      {
+        $match: {
+          organizationId: req.organizationId,
+          ...dateFilter
+        }
+      },
+      // Unwind items array to process each item separately
+      { $unwind: '$items' },
+      // Group by product
+      {
+        $group: {
+          _id: '$items.product',
+          productName: { $first: '$items.productName' },
+          serviceName: { $first: '$items.serviceName' },
+          itemType: { $first: '$items.itemType' },
+          totalQuantitySold: { $sum: '$items.quantity' },
+          totalOrders: { $sum: 1 },
+          totalRevenue: {
+            $sum: {
+              $multiply: ['$items.quantity', '$items.sellingPrice']
+            }
+          }
+        }
+      },
+      // Lookup product details for products (not services)
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productDetails'
+        }
+      },
+      // Add computed fields
+      {
+        $addFields: {
+          productInfo: { $arrayElemAt: ['$productDetails', 0] },
+          displayName: {
+            $cond: {
+              if: { $eq: ['$itemType', 'service'] },
+              then: '$serviceName',
+              else: {
+                $cond: {
+                  if: '$productName',
+                  then: '$productName',
+                  else: { $arrayElemAt: ['$productDetails.name', 0] }
+                }
+              }
+            }
+          }
+        }
+      },
+      // Sort by total quantity sold (highest first)
+      { $sort: { totalQuantitySold: -1 } },
+      // Limit results
+      { $limit: parseInt(limit) },
+      // Project final fields
+      {
+        $project: {
+          _id: 1,
+          displayName: 1,
+          itemType: 1,
+          totalQuantitySold: 1,
+          totalOrders: 1,
+          totalRevenue: 1,
+          unit: '$productInfo.unit'
+        }
+      }
+    ]);
+
+    res.json(topSellingProducts);
+  } catch (error) {
+    console.error('Top selling products error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;
