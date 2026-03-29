@@ -335,7 +335,7 @@ router.post('/:id/convert', async (req, res) => {
                     sellingPrice: item.sellingPrice,
                     discount: 0,
                     gstRate: item.gstRate || 0
-                }, taxType, 'invoice');
+                }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
                 processedItems.push({
                     itemType: 'service',
@@ -371,7 +371,7 @@ router.post('/:id/convert', async (req, res) => {
                     sellingPrice: item.sellingPrice || product.sellingPrice,
                     discount: 0,
                     gstRate: item.gstRate ?? product.gstRate
-                }, taxType, 'invoice');
+                }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
                 processedItems.push({
                     itemType: 'product',
@@ -410,7 +410,7 @@ router.post('/:id/convert', async (req, res) => {
                         sellingPrice: item.sellingPrice || batch.sellingPrice,
                         discount: 0,
                         gstRate: batch.gstRate
-                    }, taxType, 'invoice');
+                    }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
                     batchDeductions.push({ batchId: batch._id, quantity: item.quantity });
                     processedItems.push({
@@ -443,7 +443,7 @@ router.post('/:id/convert', async (req, res) => {
                     sellingPrice: item.sellingPrice || batchSale.sellingPrice,
                     discount: 0,
                     gstRate: batchSale.gstRate
-                }, taxType, 'invoice');
+                }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
                 batchDeductions.push({ batchId: batchSale.batch, quantity: batchSale.quantity });
                 processedItems.push({
@@ -465,7 +465,7 @@ router.post('/:id/convert', async (req, res) => {
         }
 
         // ── 4. Calculate invoice totals ──────────────────────────────────────
-        const totals = calculateTotals(processedItems, {}, quotation.discount || 0);
+        const totals = calculateTotals(processedItems, {}, quotation.discount || 0, shopSettings?.gstScheme || 'REGULAR');
         const balanceAmount = totals.grandTotal; // invoice starts as UNPAID
 
         // ── 5. START TRANSACTION — all writes are atomic ─────────────────────

@@ -45,9 +45,10 @@ export const determineTaxType = (shopState, partyState) => {
  * @param {Object} item - { quantity, sellingPrice/purchasePrice, discount, gstRate }
  * @param {String} taxType - 'CGST_SGST' or 'IGST'
  * @param {String} context - 'purchase' or 'invoice' (optional, defaults to 'invoice')
+ * @param {String} gstScheme - 'REGULAR' or 'COMPOSITION' (optional, defaults to 'REGULAR')
  * @returns {Object} - Complete item with tax calculations
  */
-export const calculateItemGST = (item, taxType, context = 'invoice') => {
+export const calculateItemGST = (item, taxType, context = 'invoice', gstScheme = 'REGULAR') => {
   const { quantity, sellingPrice, purchasePrice, discount = 0, gstRate } = item;
 
   // For purchases, ONLY use purchasePrice
@@ -71,7 +72,21 @@ export const calculateItemGST = (item, taxType, context = 'invoice') => {
   const discountAmount = (itemTotal * discount) / 100;
   const taxableAmount = itemTotal - discountAmount;
 
-  // Calculate GST
+  // If Composition scheme, skip GST calculation
+  if (gstScheme === 'COMPOSITION') {
+    return {
+      ...item,
+      discountAmount,
+      taxableAmount,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      totalTax: 0,
+      totalAmount: taxableAmount
+    };
+  }
+
+  // Calculate GST (Regular scheme)
   const gst = calculateGST(taxableAmount, gstRate, taxType);
 
   return {
@@ -88,14 +103,17 @@ export const calculateItemGST = (item, taxType, context = 'invoice') => {
  * @param {Array} items - Array of items with GST calculated
  * @param {Object} additionalCharges - { freight, packaging, otherCharges }
  * @param {Number} discount - Overall discount
+ * @param {String} gstScheme - 'REGULAR' or 'COMPOSITION' (optional, defaults to 'REGULAR')
  * @returns {Object} - { subtotal, totalTax, totalCGST, totalSGST, totalIGST, grandTotal }
  */
-export const calculateTotals = (items, additionalCharges = {}, discount = 0) => {
+export const calculateTotals = (items, additionalCharges = {}, discount = 0, gstScheme = 'REGULAR') => {
   const subtotal = items.reduce((sum, item) => sum + item.taxableAmount, 0);
-  const totalTax = items.reduce((sum, item) => sum + item.totalTax, 0);
-  const totalCGST = items.reduce((sum, item) => sum + (item.cgst || 0), 0);
-  const totalSGST = items.reduce((sum, item) => sum + (item.sgst || 0), 0);
-  const totalIGST = items.reduce((sum, item) => sum + (item.igst || 0), 0);
+
+  // If Composition scheme, no tax
+  const totalTax = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + item.totalTax, 0);
+  const totalCGST = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + (item.cgst || 0), 0);
+  const totalSGST = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + (item.sgst || 0), 0);
+  const totalIGST = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + (item.igst || 0), 0);
 
   const { freight = 0, packaging = 0, otherCharges = 0 } = additionalCharges;
   const additionalTotal = freight + packaging + otherCharges;

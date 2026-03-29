@@ -99,7 +99,23 @@ function generateInvoiceHTML(invoice, shopSettings, template) {
  * Generate Modern Template HTML
  */
 function generateModernHTML(invoice, shopSettings) {
-  const itemsHTML = invoice.items.map((item, index) => `
+  const isBOS = shopSettings?.gstScheme === 'COMPOSITION';
+
+  // For BOS/Composition: recalculate totals on-the-fly so old invoices (with GST in DB) display correctly
+  const displaySubtotal = isBOS
+    ? invoice.items.reduce((s, i) => s + (i.sellingPrice * i.quantity), 0)
+    : invoice.subtotal;
+  const discountAmt = invoice.discount || 0;
+  const displayGrandTotal = isBOS
+    ? Math.round(displaySubtotal - discountAmt)
+    : invoice.grandTotal;
+
+  const itemsHTML = invoice.items.map((item, index) => {
+    // Recalculate totalAmount on-the-fly so old invoices (saved with GST) display correctly in BOS mode
+    const itemTotal = isBOS
+      ? (item.sellingPrice * item.quantity)
+      : item.totalAmount;
+    return `
     <tr>
       <td style="padding: 12px 16px; font-size: 14px; color: #111827;">${index + 1}</td>
       <td style="padding: 12px 16px;">
@@ -117,10 +133,11 @@ function generateModernHTML(invoice, shopSettings) {
       <td style="padding: 12px 16px; font-size: 14px; color: #111827; text-align: center;">${item.hsnCode || '-'}</td>
       <td style="padding: 12px 16px; font-size: 14px; color: #111827; text-align: center;">${item.quantity} ${item.unit}</td>
       <td style="padding: 12px 16px; font-size: 14px; color: #111827; text-align: right;">₹${item.sellingPrice.toFixed(2)}</td>
-      <td style="padding: 12px 16px; font-size: 14px; color: #111827; text-align: center;">${item.gstRate}%</td>
-      <td style="padding: 12px 16px; font-size: 14px; font-weight: 500; color: #111827; text-align: right;">₹${item.totalAmount.toFixed(2)}</td>
+      ${!isBOS ? `<td style="padding: 12px 16px; font-size: 14px; color: #111827; text-align: center;">${item.gstRate}%</td>` : ''}
+      <td style="padding: 12px 16px; font-size: 14px; font-weight: 500; color: #111827; text-align: right;">₹${itemTotal.toFixed(2)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   return `
     <!DOCTYPE html>
@@ -147,9 +164,9 @@ function generateModernHTML(invoice, shopSettings) {
               </div>
             </div>
             <div style="display: table-cell; vertical-align: top; text-align: right; width: 300px;">
-              <div style="display: inline-block; padding: 8px 16px; border-radius: 8px; background-color: ${invoice.invoiceType === 'bill-of-supply' ? '#16a34a' : '#2563eb'}; color: white;">
+              <div style="display: inline-block; padding: 8px 16px; border-radius: 8px; background-color: ${isBOS ? '#16a34a' : '#2563eb'}; color: white;">
                 <p style="font-size: 14px; font-weight: 500; margin: 0;">
-                  ${invoice.invoiceType === 'bill-of-supply' ? 'BILL OF SUPPLY' : 'TAX INVOICE'}
+                  ${isBOS ? 'BILL OF SUPPLY' : 'TAX INVOICE'}
                 </p>
               </div>
               <p style="margin-top: 16px; font-size: 24px; font-weight: bold; color: #111827;">${invoice.invoiceNumber}</p>
@@ -211,7 +228,7 @@ function generateModernHTML(invoice, shopSettings) {
                 <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">HSN</th>
                 <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Qty</th>
                 <th style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Price</th>
-                <th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">GST %</th>
+                ${!isBOS ? '<th style="padding: 12px 16px; text-align: center; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">GST %</th>' : ''}
                 <th style="padding: 12px 16px; text-align: right; font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase;">Total</th>
               </tr>
             </thead>
@@ -228,9 +245,9 @@ function generateModernHTML(invoice, shopSettings) {
             <div style="font-size: 14px;">
               <div style="display: table; width: 100%; margin-bottom: 8px;">
                 <div style="display: table-cell; color: #4b5563;">Subtotal:</div>
-                <div style="display: table-cell; text-align: right; font-weight: 500; color: #000;">₹${invoice.subtotal.toFixed(2)}</div>
+                <div style="display: table-cell; text-align: right; font-weight: 500; color: #000;">₹${displaySubtotal.toFixed(2)}</div>
               </div>
-              ${invoice.taxType === 'CGST_SGST' ? `
+              ${!isBOS ? (invoice.taxType === 'CGST_SGST' ? `
                 <div style="display: table; width: 100%; margin-bottom: 8px;">
                   <div style="display: table-cell; color: #4b5563;">CGST:</div>
                   <div style="display: table-cell; text-align: right; font-weight: 500; color: #000;">₹${invoice.totalCGST.toFixed(2)}</div>
@@ -244,7 +261,7 @@ function generateModernHTML(invoice, shopSettings) {
                   <div style="display: table-cell; color: #4b5563;">IGST:</div>
                   <div style="display: table-cell; text-align: right; font-weight: 500; color: #000;">₹${invoice.totalIGST.toFixed(2)}</div>
                 </div>
-              `}
+              `) : ''}
               ${invoice.discount > 0 ? `
                 <div style="display: table; width: 100%; margin-bottom: 8px;">
                   <div style="display: table-cell; color: #4b5563;">Discount:</div>
@@ -260,7 +277,7 @@ function generateModernHTML(invoice, shopSettings) {
               <div style="padding-top: 12px; border-top: 2px solid #1f2937; margin-top: 12px;">
                 <div style="display: table; width: 100%; font-size: 18px; font-weight: bold;">
                   <div style="display: table-cell; color: #000;">Grand Total:</div>
-                  <div style="display: table-cell; text-align: right; color: #000;">₹${invoice.grandTotal.toLocaleString('en-IN')}</div>
+                  <div style="display: table-cell; text-align: right; color: #000;">₹${displayGrandTotal.toLocaleString('en-IN')}</div>
                 </div>
               </div>
               <div style="padding-top: 8px; border-top: 1px solid #d1d5db; margin-top: 8px;">
@@ -362,9 +379,16 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
     return w + ' Only';
   }
 
-  const isBOS = invoice.invoiceType === 'bill-of-supply';
+  // Check if this is a Bill of Supply (Composition Scheme - no GST)
+  const isBOS = shopSettings?.gstScheme === 'COMPOSITION';
   const hasTerms = shopSettings?.invoiceTerms || shopSettings?.termsAndConditions;
   const hasBankDetails = shopSettings?.invBankName || shopSettings?.invAccountNumber;
+
+  // For BOS/Composition: recalculate grand total from items (no GST) for backward-compat with old records
+  const displaySubtotalTally = invoice.items.reduce((s, i) => s + (i.sellingPrice * i.quantity), 0);
+  const displayGrandTotal = isBOS
+    ? Math.round(displaySubtotalTally - (invoice.discount || 0))
+    : invoice.grandTotal;
 
   // Build HSN-wise tax summary
   const hsnMap = {};
@@ -592,7 +616,7 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
             <td style="border: ${B}; padding: 3px 2px;"></td>
             <td style="border: ${B}; padding: 3px 2px;"></td>
             <td style="border: ${B}; padding: 3px 2px; text-align: right; font-size: 10px;">
-              ₹ ${invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹ ${displayGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </td>
           </tr>
         </tbody>
@@ -611,7 +635,7 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
           </tr>
           <tr>
             <td colspan="2" style="border: ${B}; border-top: none; padding: 3px 5px; font-weight: bold; font-size: 11px;">
-              ${rupeeWords(invoice.grandTotal)}
+              ${rupeeWords(displayGrandTotal)}
             </td>
           </tr>
         </tbody>

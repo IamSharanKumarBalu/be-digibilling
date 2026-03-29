@@ -61,6 +61,11 @@ const shopSettingsSchema = new mongoose.Schema({
     enum: ['CGST_SGST', 'IGST'],
     default: 'CGST_SGST'
   },
+  gstScheme: {
+    type: String,
+    enum: ['REGULAR', 'COMPOSITION'],
+    default: 'REGULAR'
+  },
   invoicePrefix: {
     type: String,
     default: 'INV'

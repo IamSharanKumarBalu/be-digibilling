@@ -1,5 +1,6 @@
 import express from 'express';
 import DeliveryChallan from '../models/DeliveryChallan.js';
+import ShopSettings from '../models/ShopSettings.js';
 import { protect } from '../middleware/auth.js';
 import { tenantIsolation, addOrgFilter } from '../middleware/tenantIsolation.js';
 
@@ -7,10 +8,11 @@ const router = express.Router();
 router.use(protect);
 router.use(tenantIsolation);
 
-// ── Helper: calculate item GST totals ──────────────────────────────────────
-const calcItem = (item, taxType) => {
+// ── Helper: calculate item GST totals ──────────────────────────────────────────
+const calcItem = (item, taxType, gstScheme = 'REGULAR') => {
     const taxable = (item.sellingPrice || 0) * (item.quantity || 1);
-    const taxAmt = taxType === 'NONE' ? 0 : (taxable * (item.gstRate || 0)) / 100;
+    // Composition scheme: no GST charged to customer
+    const taxAmt = (gstScheme === 'COMPOSITION' || taxType === 'NONE') ? 0 : (taxable * (item.gstRate || 0)) / 100;
     const half = taxAmt / 2;
     return {
         taxableAmount: taxable,
@@ -22,10 +24,10 @@ const calcItem = (item, taxType) => {
     };
 };
 
-// ── Process items (shared by create & update) ──────────────────────────────
-const processItems = (items = [], taxType = 'CGST_SGST') => {
+// ── Process items (shared by create & update) ───────────────────────────────
+const processItems = (items = [], taxType = 'CGST_SGST', gstScheme = 'REGULAR') => {
     return items.map(item => {
-        const gstCalc = calcItem(item, taxType);
+        const gstCalc = calcItem(item, taxType, gstScheme);
         if (item.itemType === 'service') {
             return {
                 itemType: 'service',
@@ -58,12 +60,13 @@ const processItems = (items = [], taxType = 'CGST_SGST') => {
 };
 
 // ── Recalculate document-level totals ──────────────────────────────────────
-const calcTotals = (processedItems, taxType, discountAmt) => {
+const calcTotals = (processedItems, taxType, discountAmt, gstScheme = 'REGULAR') => {
     const subtotal = processedItems.reduce((s, i) => s + i.taxableAmount, 0);
-    const totalTax = processedItems.reduce((s, i) => s + i.taxAmount, 0);
-    const totalCGST = taxType === 'CGST_SGST' ? processedItems.reduce((s, i) => s + (i.cgst || 0), 0) : 0;
-    const totalSGST = taxType === 'CGST_SGST' ? processedItems.reduce((s, i) => s + (i.sgst || 0), 0) : 0;
-    const totalIGST = taxType === 'IGST' ? processedItems.reduce((s, i) => s + (i.igst || 0), 0) : 0;
+    // Composition scheme: no GST in totals
+    const totalTax = gstScheme === 'COMPOSITION' ? 0 : processedItems.reduce((s, i) => s + i.taxAmount, 0);
+    const totalCGST = gstScheme === 'COMPOSITION' ? 0 : (taxType === 'CGST_SGST' ? processedItems.reduce((s, i) => s + (i.cgst || 0), 0) : 0);
+    const totalSGST = gstScheme === 'COMPOSITION' ? 0 : (taxType === 'CGST_SGST' ? processedItems.reduce((s, i) => s + (i.sgst || 0), 0) : 0);
+    const totalIGST = gstScheme === 'COMPOSITION' ? 0 : (taxType === 'IGST' ? processedItems.reduce((s, i) => s + (i.igst || 0), 0) : 0);
     const grandTotalRaw = subtotal + totalTax - discountAmt;
     const roundOff = Math.round(grandTotalRaw) - grandTotalRaw;
     const grandTotal = Math.round(grandTotalRaw);
@@ -117,9 +120,12 @@ router.post('/', async (req, res) => {
         }
 
         const taxType = data.taxType || 'CGST_SGST';
-        const processedItems = processItems(items, taxType);
+        // Fetch shop settings to determine GST scheme (REGULAR / COMPOSITION)
+        const shopSettings = await ShopSettings.findOne({ organizationId: req.organizationId || req.user.organizationId }).lean();
+        const gstScheme = shopSettings?.gstScheme || 'REGULAR';
+        const processedItems = processItems(items, taxType, gstScheme);
         const discountAmt = Number(data.discount) || 0;
-        const totals = calcTotals(processedItems, taxType, discountAmt);
+        const totals = calcTotals(processedItems, taxType, discountAmt, gstScheme);
 
         const doc = new DeliveryChallan({
             organizationId: req.organizationId || req.user.organizationId,
@@ -196,9 +202,12 @@ router.put('/:id', async (req, res) => {
 
         // Full update with items recalculation
         const taxType = data.taxType || existing.taxType || 'CGST_SGST';
-        const processedItems = processItems(items, taxType);
+        // Fetch shop settings to determine GST scheme (REGULAR / COMPOSITION)
+        const shopSettings = await ShopSettings.findOne({ organizationId: req.organizationId || req.user.organizationId }).lean();
+        const gstScheme = shopSettings?.gstScheme || 'REGULAR';
+        const processedItems = processItems(items, taxType, gstScheme);
         const discountAmt = data.discount !== undefined ? Number(data.discount) : existing.discount;
-        const totals = calcTotals(processedItems, taxType, discountAmt);
+        const totals = calcTotals(processedItems, taxType, discountAmt, gstScheme);
 
         const updated = await DeliveryChallan.findByIdAndUpdate(
             existing._id,

@@ -335,7 +335,7 @@ router.post('/', async (req, res) => {
           sellingPrice: item.sellingPrice || 0,
           discount: item.discount || 0,
           gstRate: item.gstRate || 0
-        }, taxType, 'invoice');
+        }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
         processedItems.push({
           itemType: 'service',
@@ -377,7 +377,7 @@ router.post('/', async (req, res) => {
           sellingPrice: item.sellingPrice || product.sellingPrice,
           discount: item.discount || 0,
           gstRate: item.gstRate ?? product.gstRate
-        }, taxType, 'invoice');
+        }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
         processedItems.push({
           itemType: 'product',
@@ -429,7 +429,7 @@ router.post('/', async (req, res) => {
           sellingPrice: item.sellingPrice || batch.sellingPrice,
           discount: item.discount || 0,
           gstRate: batch.gstRate
-        }, taxType, 'invoice');
+        }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
         // Register deduction — applied atomically inside the transaction
         batchDeductions.push({
@@ -467,7 +467,7 @@ router.post('/', async (req, res) => {
             sellingPrice: item.sellingPrice || batchSale.sellingPrice,
             discount: item.discount || 0,
             gstRate: batchSale.gstRate
-          }, taxType, 'invoice');
+          }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
           // Register deduction — applied atomically inside the transaction
           batchDeductions.push({ batchId: batchSale.batch, quantity: batchSale.quantity });
@@ -492,7 +492,7 @@ router.post('/', async (req, res) => {
     }
 
     // Calculate invoice totals (pure computation — no DB writes)
-    const totals = calculateTotals(processedItems, {}, invoiceData.discount || 0);
+    const totals = calculateTotals(processedItems, {}, invoiceData.discount || 0, shopSettings?.gstScheme || 'REGULAR');
     const cogs = await calculateCOGS(processedItems);
     const paidAmount = invoiceData.paidAmount || 0;
     const balanceAmount = totals.grandTotal - paidAmount;
@@ -880,7 +880,7 @@ router.put('/:id', async (req, res) => {
             sellingPrice: item.sellingPrice || batch.sellingPrice,
             discount: item.discount || 0,
             gstRate: batch.gstRate
-          }, taxType, 'invoice');
+          }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
           processedItems.push({
             product: product._id,
@@ -921,7 +921,7 @@ router.put('/:id', async (req, res) => {
               sellingPrice: item.sellingPrice || batchSale.sellingPrice,
               discount: item.discount || 0,
               gstRate: batchSale.gstRate
-            }, taxType, 'invoice');
+            }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
             processedItems.push({
               product: product._id,
@@ -975,7 +975,7 @@ router.put('/:id', async (req, res) => {
           sellingPrice: item.sellingPrice !== undefined ? item.sellingPrice : oldItem.sellingPrice,
           discount: item.discount !== undefined ? item.discount : oldItem.discount,
           gstRate: batch.gstRate
-        }, taxType, 'invoice');
+        }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
 
         processedItems.push({
           product: product._id,
@@ -1009,7 +1009,8 @@ router.put('/:id', async (req, res) => {
     const totals = calculateTotals(
       processedItems,
       { deliveryCharges, packagingCharges, otherCharges },
-      discount
+      discount,
+      shopSettings?.gstScheme || 'REGULAR'
     );
 
     // Calculate paidAmount from payments array to maintain consistency
