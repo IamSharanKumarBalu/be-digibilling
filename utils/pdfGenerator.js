@@ -204,7 +204,7 @@ function generateModernHTML(invoice, shopSettings) {
           </div>
         </div>
 
-        ${(invoice.poNumber || invoice.poDate) ? `
+        ${(invoice.poNumber || invoice.poDate || invoice.eWayBillNumber) ? `
         <div style="margin-bottom: 24px; font-size: 14px;">
           ${invoice.poNumber ? `
             <span style="color: #6b7280; font-weight: 500;">P.O. No.: </span>
@@ -214,6 +214,11 @@ function generateModernHTML(invoice, shopSettings) {
           ${invoice.poDate ? `
             <span style="color: #6b7280; font-weight: 500;">P.O. Date: </span>
             <span style="color: #111827;">${new Date(invoice.poDate).toLocaleDateString('en-IN')}</span>
+            <span style="margin: 0 16px;"></span>
+          ` : ''}
+          ${invoice.eWayBillNumber ? `
+            <span style="color: #6b7280; font-weight: 500;">e-Way Bill No.: </span>
+            <span style="color: #111827; font-weight: 600;">${invoice.eWayBillNumber}</span>
           ` : ''}
         </div>
         ` : ''}
@@ -415,7 +420,7 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
   const invoiceDetailRows = [
     ['Invoice No.', invoice.invoiceNumber, 'Dated', fmt(invoice.invoiceDate)],
     ['Delivery Note', invoice.deliveryNote || '', 'Mode/Terms of Payment', invoice.paymentMethod || ''],
-    ['Reference No. & Date.', invoice.referenceNo || invoice.eWayBillNumber || '', 'Other References', invoice.otherReferences || ''],
+    ['Reference No. & Date.', invoice.referenceNo || '', invoice.eWayBillNumber ? 'e-Way Bill No.' : 'Other References', invoice.eWayBillNumber ? invoice.eWayBillNumber + (invoice.otherReferences ? ` (${invoice.otherReferences})` : '') : (invoice.otherReferences || '')],
     ["Buyer's Order No.", invoice.poNumber || '', 'Dated', fmt(invoice.poDate)],
     ['Dispatch Doc No.', invoice.transportDocNumber || '', 'Delivery Note Date', fmt(invoice.transportDocDate)],
     ['Dispatched through', [invoice.transporterName, invoice.vehicleNumber].filter(Boolean).join(' | '), 'Destination', invoice.destination || invoice.pos || invoice.customerCity || ''],
