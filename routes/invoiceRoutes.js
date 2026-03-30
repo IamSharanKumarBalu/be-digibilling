@@ -18,8 +18,6 @@ const router = express.Router();
 // @desc    Get invoice as PDF (Public - No Auth Required)
 // @access  Public
 router.get('/:id/pdf', async (req, res) => {
-  console.log('PDF request received for invoice ID:', req.params.id);
-
   try {
     // Find invoice without organization filter (public access)
     const invoice = await Invoice.findById(req.params.id)
@@ -32,14 +30,10 @@ router.get('/:id/pdf', async (req, res) => {
       return res.status(404).send('Invoice not found');
     }
 
-    console.log('Invoice found:', invoice.invoiceNumber);
-
     // Get shop settings for the invoice's organization
     const shopSettings = await ShopSettings.findOne({
       organizationId: invoice.organizationId
     });
-
-    console.log('Shop settings found:', shopSettings?.shopName);
 
     // Generate PDF
     const pdfBuffer = await generateInvoicePDF(invoice, shopSettings);
@@ -49,7 +43,6 @@ router.get('/:id/pdf', async (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename="Invoice-${invoice.invoiceNumber}.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
 
-    console.log('Sending PDF response...');
     // Send as binary buffer, not JSON
     res.end(pdfBuffer, 'binary');
   } catch (error) {

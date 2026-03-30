@@ -8,7 +8,7 @@ import chromium from '@sparticuz/chromium';
  * @param {String} template - Template type: 'modern', 'tally-portrait', 'tally-landscape'
  * @returns {Buffer} PDF buffer
  */
-export async function generateInvoicePDF(invoice, shopSettings, template = 'modern') {
+export async function generateInvoicePDF(invoice, shopSettings, template) {
   console.log('Starting PDF generation for invoice:', invoice.invoiceNumber);
 
   const html = generateInvoiceHTML(invoice, shopSettings, template);
@@ -56,11 +56,22 @@ export async function generateInvoicePDF(invoice, shopSettings, template = 'mode
     await new Promise(resolve => setTimeout(resolve, 500));
 
     console.log('Generating PDF...');
+
+    // Use thermal receipt dimensions for thermal template
+    const selectedTemplate = template || shopSettings?.invoiceTemplate || 'our-format';
+    const isThermal = selectedTemplate === 'thermal-receipt';
     const pdfBuffer = await page.pdf({
-      format: 'A4',
+      format: isThermal ? undefined : 'A4',
+      width: isThermal ? '80mm' : undefined,
+      height: isThermal ? undefined : undefined,
       landscape: false,
       printBackground: true,
-      margin: {
+      margin: isThermal ? {
+        top: '5mm',
+        right: '3mm',
+        bottom: '5mm',
+        left: '3mm'
+      } : {
         top: '10mm',
         right: '10mm',
         bottom: '10mm',
@@ -85,12 +96,17 @@ export async function generateInvoicePDF(invoice, shopSettings, template = 'mode
  * Generate HTML for invoice based on template
  */
 function generateInvoiceHTML(invoice, shopSettings, template) {
-  // Use the appropriate template based on shop settings
-  if (template === 'tally-portrait' || shopSettings?.invoiceTemplate === 'tally-portrait') {
+  // Use the appropriate template based on shop settings or template parameter
+  const selectedTemplate = template || shopSettings?.invoiceTemplate || 'our-format';
+
+  if (selectedTemplate === 'tally-portrait') {
     return generateTallyPortraitHTML(invoice, shopSettings);
-  } else if (template === 'tally-landscape' || shopSettings?.invoiceTemplate === 'tally-landscape') {
+  } else if (selectedTemplate === 'tally-landscape') {
     return generateTallyPortraitHTML(invoice, shopSettings); // Using portrait for now, can add landscape later
+  } else if (selectedTemplate === 'thermal-receipt') {
+    return generateThermalReceiptHTML(invoice, shopSettings);
   } else {
+    // Default to Modern template for 'our-format' or 'modern' or any other value
     return generateModernHTML(invoice, shopSettings);
   }
 }
@@ -755,6 +771,224 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
       <!-- Footer -->
       <div style="text-align: center; padding: 4px 0; font-size: 10px; font-style: italic;">
         This is a Computer Generated Invoice
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Generate Thermal Receipt Template HTML (80mm POS/Grocery format)
+ */
+function generateThermalReceiptHTML(invoice, shopSettings) {
+  const isBOS = shopSettings?.gstScheme === 'COMPOSITION';
+
+  // For BOS/Composition: recalculate totals on-the-fly
+  const displaySubtotal = isBOS
+    ? invoice.items.reduce((s, i) => s + (i.sellingPrice * i.quantity), 0)
+    : invoice.subtotal;
+  const discountAmt = invoice.discount || 0;
+  const displayGrandTotal = isBOS
+    ? Math.round(displaySubtotal - discountAmt)
+    : invoice.grandTotal;
+
+  const itemsHTML = invoice.items.map((item) => {
+    const itemTotal = isBOS
+      ? (item.sellingPrice * item.quantity)
+      : item.totalAmount;
+    return `
+    <tr>
+      <td style="padding: 4px 2px; font-size: 11px; color: #000; border-bottom: 1px dashed #ddd;">
+        <div style="font-weight: bold;">${item.productName}</div>
+        ${item.hsnCode ? `<div style="font-size: 9px; color: #666;">HSN: ${item.hsnCode}</div>` : ''}
+        ${(item.batchNo || item.expiryDate) ? `
+          <div style="font-size: 9px; color: #666;">
+            ${item.batchNo ? `Batch: ${item.batchNo}` : ''}
+            ${item.batchNo && item.expiryDate ? ' | ' : ''}
+            ${item.expiryDate ? `Exp: ${new Date(item.expiryDate).toLocaleDateString('en-GB', { month: '2-digit', year: 'numeric' })}` : ''}
+          </div>
+        ` : ''}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 0 2px 4px 2px; font-size: 11px; color: #000; border-bottom: 1px dashed #ddd;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="width: 50%; font-size: 10px; color: #555;">
+              ${item.quantity} ${item.unit} × ₹${item.sellingPrice.toFixed(2)}
+              ${!isBOS && item.gstRate ? ` @ ${item.gstRate}%` : ''}
+            </td>
+            <td style="width: 50%; text-align: right; font-size: 11px; font-weight: bold;">
+              ₹${itemTotal.toFixed(2)}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  `;
+  }).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Courier New', monospace;
+          font-size: 11px;
+          color: #000;
+          background: #fff;
+          width: 80mm;
+          padding: 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div style="padding: 8px;">
+
+        <!-- Shop Header -->
+        <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 8px; margin-bottom: 8px;">
+          <div style="font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">
+            ${shopSettings?.shopName || 'SHOP NAME'}
+          </div>
+          ${shopSettings?.address ? `<div style="font-size: 10px;">${shopSettings.address}</div>` : ''}
+          <div style="font-size: 10px;">
+            ${[shopSettings?.city, shopSettings?.state, shopSettings?.pincode].filter(Boolean).join(', ')}
+          </div>
+          ${shopSettings?.phone ? `<div style="font-size: 10px; margin-top: 2px;">Ph: ${shopSettings.phone}</div>` : ''}
+          ${shopSettings?.gstin ? `<div style="font-size: 10px; margin-top: 2px;">GSTIN: ${shopSettings.gstin}</div>` : ''}
+        </div>
+
+        <!-- Invoice Type & Number -->
+        <div style="text-align: center; margin-bottom: 8px;">
+          <div style="font-size: 13px; font-weight: bold; text-transform: uppercase;">
+            ${isBOS ? 'BILL OF SUPPLY' : 'TAX INVOICE'}
+          </div>
+          <div style="font-size: 11px; margin-top: 2px;">
+            ${invoice.invoiceNumber}
+          </div>
+          <div style="font-size: 10px; color: #555;">
+            ${new Date(invoice.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            ${new Date(invoice.invoiceDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        <!-- Customer Info -->
+        ${invoice.customerName ? `
+        <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin-bottom: 8px; font-size: 10px;">
+          <div style="font-weight: bold;">Customer: ${invoice.customerName}</div>
+          ${invoice.customerPhone ? `<div style="margin-top: 2px;">Ph: ${invoice.customerPhone}</div>` : ''}
+          ${invoice.customerGstin ? `<div style="margin-top: 2px;">GSTIN: ${invoice.customerGstin}</div>` : ''}
+        </div>
+        ` : ''}
+
+        <!-- Items Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 4px 2px; font-size: 11px; font-weight: bold; border-bottom: 2px solid #000;">
+                ITEM DETAILS
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+
+        <!-- Totals Section -->
+        <div style="border-top: 2px solid #000; padding-top: 6px; margin-top: 8px;">
+          <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 2px 0;">Subtotal:</td>
+              <td style="text-align: right; padding: 2px 0;">₹${displaySubtotal.toFixed(2)}</td>
+            </tr>
+            ${!isBOS ? (invoice.taxType === 'CGST_SGST' ? `
+              <tr>
+                <td style="padding: 2px 0;">CGST:</td>
+                <td style="text-align: right; padding: 2px 0;">₹${(invoice.totalCGST || 0).toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 2px 0;">SGST:</td>
+                <td style="text-align: right; padding: 2px 0;">₹${(invoice.totalSGST || 0).toFixed(2)}</td>
+              </tr>
+            ` : `
+              <tr>
+                <td style="padding: 2px 0;">IGST:</td>
+                <td style="text-align: right; padding: 2px 0;">₹${(invoice.totalIGST || 0).toFixed(2)}</td>
+              </tr>
+            `) : ''}
+            ${invoice.discount > 0 ? `
+              <tr>
+                <td style="padding: 2px 0;">Discount:</td>
+                <td style="text-align: right; padding: 2px 0;">-₹${invoice.discount.toFixed(2)}</td>
+              </tr>
+            ` : ''}
+            ${invoice.roundOff !== 0 ? `
+              <tr>
+                <td style="padding: 2px 0;">Round Off:</td>
+                <td style="text-align: right; padding: 2px 0;">₹${invoice.roundOff.toFixed(2)}</td>
+              </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        <!-- Grand Total -->
+        <div style="border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 8px 0; margin-top: 4px; margin-bottom: 8px;">
+          <table style="width: 100%; font-size: 14px; font-weight: bold; border-collapse: collapse;">
+            <tr>
+              <td>TOTAL:</td>
+              <td style="text-align: right;">₹${displayGrandTotal.toLocaleString('en-IN')}</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Payment Info -->
+        <div style="font-size: 10px; margin-bottom: 8px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 2px 0;">Paid:</td>
+              <td style="text-align: right; padding: 2px 0; font-weight: bold;">₹${invoice.paidAmount.toLocaleString('en-IN')}</td>
+            </tr>
+            ${invoice.balanceAmount > 0 ? `
+              <tr>
+                <td style="padding: 2px 0;">Balance:</td>
+                <td style="text-align: right; padding: 2px 0; font-weight: bold;">₹${invoice.balanceAmount.toLocaleString('en-IN')}</td>
+              </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 2px 0;">Payment:</td>
+              <td style="text-align: right; padding: 2px 0;">${invoice.paymentStatus || 'N/A'}</td>
+            </tr>
+          </table>
+        </div>
+
+        ${invoice.notes ? `
+        <!-- Notes -->
+        <div style="border-top: 1px dashed #000; padding-top: 6px; margin-top: 6px; font-size: 9px; color: #555;">
+          <div style="font-weight: bold; margin-bottom: 2px;">Notes:</div>
+          <div>${invoice.notes}</div>
+        </div>
+        ` : ''}
+
+        ${(shopSettings?.invoiceTerms || shopSettings?.termsAndConditions) ? `
+        <!-- Terms -->
+        <div style="border-top: 1px dashed #000; padding-top: 6px; margin-top: 6px; font-size: 9px; color: #555;">
+          <div style="font-weight: bold; margin-bottom: 2px;">Terms & Conditions:</div>
+          <div style="white-space: pre-wrap;">${shopSettings.invoiceTerms || shopSettings.termsAndConditions}</div>
+        </div>
+        ` : ''}
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 12px; padding-top: 8px; border-top: 2px dashed #000; font-size: 10px;">
+          <div style="font-weight: bold; margin-bottom: 4px;">Thank You! Visit Again!</div>
+          <div style="font-size: 8px; color: #666;">
+            This is a computer generated receipt
+          </div>
+        </div>
+
       </div>
     </body>
     </html>

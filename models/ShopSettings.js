@@ -98,7 +98,7 @@ const shopSettingsSchema = new mongoose.Schema({
   // --- Invoice Template ---
   invoiceTemplate: {
     type: String,
-    enum: ['our-format', 'tally-portrait', 'tally-landscape'],
+    enum: ['our-format', 'tally-portrait', 'tally-landscape', 'thermal-receipt'],
     default: 'our-format'
   },
 
