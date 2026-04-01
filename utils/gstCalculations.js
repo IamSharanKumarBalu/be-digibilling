@@ -102,23 +102,42 @@ export const calculateItemGST = (item, taxType, context = 'invoice', gstScheme =
  * Calculate total amounts for invoice/purchase
  * @param {Array} items - Array of items with GST calculated
  * @param {Object} additionalCharges - { freight, packaging, otherCharges }
- * @param {Number} discount - Overall discount
+ * @param {Number} discount - Overall discount (applied BEFORE GST)
  * @param {String} gstScheme - 'REGULAR' or 'COMPOSITION' (optional, defaults to 'REGULAR')
  * @returns {Object} - { subtotal, totalTax, totalCGST, totalSGST, totalIGST, grandTotal }
  */
 export const calculateTotals = (items, additionalCharges = {}, discount = 0, gstScheme = 'REGULAR') => {
   const subtotal = items.reduce((sum, item) => sum + item.taxableAmount, 0);
 
+  // Apply discount BEFORE GST calculation
+  const subtotalAfterDiscount = subtotal - discount;
+
+  // Calculate discount ratio for proportional distribution
+  const discountRatio = subtotal > 0 ? subtotalAfterDiscount / subtotal : 1;
+
   // If Composition scheme, no tax
-  const totalTax = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + item.totalTax, 0);
-  const totalCGST = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + (item.cgst || 0), 0);
-  const totalSGST = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + (item.sgst || 0), 0);
-  const totalIGST = gstScheme === 'COMPOSITION' ? 0 : items.reduce((sum, item) => sum + (item.igst || 0), 0);
+  let totalTax = 0;
+  let totalCGST = 0;
+  let totalSGST = 0;
+  let totalIGST = 0;
+
+  if (gstScheme !== 'COMPOSITION') {
+    // Recalculate tax on discounted amounts proportionally
+    items.forEach(item => {
+      const itemAfterDiscount = item.taxableAmount * discountRatio;
+      const itemTax = item.totalTax * discountRatio;
+
+      totalTax += itemTax;
+      totalCGST += (item.cgst || 0) * discountRatio;
+      totalSGST += (item.sgst || 0) * discountRatio;
+      totalIGST += (item.igst || 0) * discountRatio;
+    });
+  }
 
   const { freight = 0, packaging = 0, otherCharges = 0 } = additionalCharges;
   const additionalTotal = freight + packaging + otherCharges;
 
-  const grandTotal = subtotal + totalTax + additionalTotal - discount;
+  const grandTotal = subtotalAfterDiscount + totalTax + additionalTotal;
   const roundOff = Math.round(grandTotal) - grandTotal;
 
   return {
