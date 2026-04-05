@@ -127,10 +127,16 @@ function generateModernHTML(invoice, shopSettings) {
     : invoice.grandTotal;
 
   const itemsHTML = invoice.items.map((item, index) => {
-    // Recalculate totalAmount on-the-fly so old invoices (saved with GST) display correctly in BOS mode
-    const itemTotal = isBOS
-      ? (item.sellingPrice * item.quantity)
-      : item.totalAmount;
+    // Calculate item total with its own discount (NEW: item-level discounts)
+    const itemBaseAmount = item.sellingPrice * item.quantity;
+    const itemDiscountAmt = item.discountAmount || 0;
+    const itemAfterDiscount = itemBaseAmount - itemDiscountAmt;
+    let itemTaxAmount = 0;
+    if (!isBOS) {
+      itemTaxAmount = (itemAfterDiscount * (item.gstRate || 0)) / 100;
+    }
+    const itemTotal = itemAfterDiscount + itemTaxAmount;
+
     return `
     <tr>
       <td style="padding: 12px 16px; font-size: 14px; color: #111827;">${index + 1}</td>
@@ -443,7 +449,11 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
   ];
 
   const itemsHTML = invoice.items.map((item, index) => {
-    const taxable = item.sellingPrice * item.quantity;
+    const baseAmount = item.sellingPrice * item.quantity;
+    const itemDiscountAmt = item.discountAmount || 0;
+    const taxableAfterDiscount = baseAmount - itemDiscountAmt;  // Amount AFTER discount
+    // Show discount amount for Bill of Supply or when item has discount
+    const showDiscount = isBOS ? '0%' : (itemDiscountAmt > 0 ? `₹${itemDiscountAmt.toFixed(2)}` : '');
     return `
       <tr style="border-bottom: 1px dashed #ccc;">
         <td style="border: ${B}; padding: 3px 2px; text-align: center; font-size: 10px;">${index + 1}</td>
@@ -463,8 +473,8 @@ function generateTallyPortraitHTML(invoice, shopSettings) {
         <td style="border: ${B}; padding: 3px 2px; text-align: center; font-size: 10px;">${item.quantity} ${item.unit}</td>
         <td style="border: ${B}; padding: 3px 2px; text-align: right; font-size: 10px;">${item.sellingPrice.toFixed(2)}</td>
         <td style="border: ${B}; padding: 3px 2px; text-align: center; font-size: 10px;">${item.unit}</td>
-        <td style="border: ${B}; padding: 3px 2px; text-align: center; font-size: 10px;"></td>
-        <td style="border: ${B}; padding: 3px 2px; text-align: right; font-size: 10px;">${taxable.toFixed(2)}</td>
+        <td style="border: ${B}; padding: 3px 2px; text-align: center; font-size: 10px;">${showDiscount}</td>
+        <td style="border: ${B}; padding: 3px 2px; text-align: right; font-size: 10px;">${taxableAfterDiscount.toFixed(2)}</td>
       </tr>
     `;
   }).join('');
@@ -793,9 +803,16 @@ function generateThermalReceiptHTML(invoice, shopSettings) {
     : invoice.grandTotal;
 
   const itemsHTML = invoice.items.map((item) => {
-    const itemTotal = isBOS
-      ? (item.sellingPrice * item.quantity)
-      : item.totalAmount;
+    // Calculate item total with its own discount (NEW: item-level discounts)
+    const itemBaseAmount = item.sellingPrice * item.quantity;
+    const itemDiscountAmt = item.discountAmount || 0;
+    const itemAfterDiscount = itemBaseAmount - itemDiscountAmt;
+    let itemTaxAmount = 0;
+    if (!isBOS) {
+      itemTaxAmount = (itemAfterDiscount * (item.gstRate || 0)) / 100;
+    }
+    const itemTotal = itemAfterDiscount + itemTaxAmount;
+
     return `
     <tr>
       <td style="padding: 4px 2px; font-size: 11px; color: #000; border-bottom: 1px dashed #ddd;">

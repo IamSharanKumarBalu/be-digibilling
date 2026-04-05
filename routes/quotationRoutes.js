@@ -15,20 +15,23 @@ const router = express.Router();
 router.use(protect);
 router.use(tenantIsolation);
 
-// Helper: calculate item totals
+// Helper: calculate item totals (supports item-level discountAmount)
 const calcItem = (item, taxType) => {
-    const taxable = item.sellingPrice * item.quantity;
+    const grossAmount = (item.sellingPrice || 0) * (item.quantity || 0);
+    const discountAmount = item.discountAmount || 0;
+    const taxableAmount = grossAmount - discountAmount;
     const taxAmt = taxType === 'IGST'
-        ? (taxable * item.gstRate) / 100
-        : (taxable * item.gstRate) / 100;
+        ? (taxableAmount * (item.gstRate || 0)) / 100
+        : (taxableAmount * (item.gstRate || 0)) / 100;
     const half = taxAmt / 2;
     return {
-        taxableAmount: taxable,
+        discountAmount,
+        taxableAmount,
         taxAmount: taxAmt,
         cgst: taxType === 'CGST_SGST' ? half : 0,
         sgst: taxType === 'CGST_SGST' ? half : 0,
         igst: taxType === 'IGST' ? taxAmt : 0,
-        totalAmount: taxable + taxAmt,
+        totalAmount: taxableAmount + taxAmt,
     };
 };
 

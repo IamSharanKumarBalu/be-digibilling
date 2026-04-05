@@ -326,6 +326,7 @@ router.post('/', async (req, res) => {
         const itemWithGST = calculateItemGST({
           quantity: item.quantity,
           sellingPrice: item.sellingPrice || 0,
+          discountAmount: item.discountAmount || 0,
           discount: item.discount || 0,
           gstRate: item.gstRate || 0
         }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
@@ -368,6 +369,7 @@ router.post('/', async (req, res) => {
         const itemWithGST = calculateItemGST({
           quantity: item.quantity,
           sellingPrice: item.sellingPrice || product.sellingPrice,
+          discountAmount: item.discountAmount || 0,
           discount: item.discount || 0,
           gstRate: item.gstRate ?? product.gstRate
         }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
@@ -420,6 +422,7 @@ router.post('/', async (req, res) => {
         const itemWithGST = calculateItemGST({
           quantity: item.quantity,
           sellingPrice: item.sellingPrice || batch.sellingPrice,
+          discountAmount: item.discountAmount || 0,
           discount: item.discount || 0,
           gstRate: batch.gstRate
         }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
@@ -458,6 +461,7 @@ router.post('/', async (req, res) => {
           const itemWithGST = calculateItemGST({
             quantity: batchSale.quantity,
             sellingPrice: item.sellingPrice || batchSale.sellingPrice,
+            discountAmount: item.discountAmount || 0,
             discount: item.discount || 0,
             gstRate: batchSale.gstRate
           }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
@@ -871,6 +875,7 @@ router.put('/:id', async (req, res) => {
           const itemWithGST = calculateItemGST({
             quantity: item.quantity,
             sellingPrice: item.sellingPrice || batch.sellingPrice,
+            discountAmount: item.discountAmount || 0,
             discount: item.discount || 0,
             gstRate: batch.gstRate
           }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
@@ -912,6 +917,7 @@ router.put('/:id', async (req, res) => {
             const itemWithGST = calculateItemGST({
               quantity: batchSale.quantity,
               sellingPrice: item.sellingPrice || batchSale.sellingPrice,
+              discountAmount: item.discountAmount || 0,
               discount: item.discount || 0,
               gstRate: batchSale.gstRate
             }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');
@@ -966,6 +972,7 @@ router.put('/:id', async (req, res) => {
         const itemWithGST = calculateItemGST({
           quantity: item.quantity,
           sellingPrice: item.sellingPrice !== undefined ? item.sellingPrice : oldItem.sellingPrice,
+          discountAmount: item.discountAmount !== undefined ? item.discountAmount : (oldItem.discountAmount || 0),
           discount: item.discount !== undefined ? item.discount : oldItem.discount,
           gstRate: batch.gstRate
         }, taxType, 'invoice', shopSettings?.gstScheme || 'REGULAR');

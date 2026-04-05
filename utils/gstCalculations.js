@@ -42,14 +42,14 @@ export const determineTaxType = (shopState, partyState) => {
 
 /**
  * Calculate item-level GST for invoice/purchase items
- * @param {Object} item - { quantity, sellingPrice/purchasePrice, discount, gstRate }
+ * @param {Object} item - { quantity, sellingPrice/purchasePrice, discountAmount, gstRate }
  * @param {String} taxType - 'CGST_SGST' or 'IGST'
  * @param {String} context - 'purchase' or 'invoice' (optional, defaults to 'invoice')
  * @param {String} gstScheme - 'REGULAR' or 'COMPOSITION' (optional, defaults to 'REGULAR')
  * @returns {Object} - Complete item with tax calculations
  */
 export const calculateItemGST = (item, taxType, context = 'invoice', gstScheme = 'REGULAR') => {
-  const { quantity, sellingPrice, purchasePrice, discount = 0, gstRate } = item;
+  const { quantity, sellingPrice, purchasePrice, discountAmount = 0, discount = 0, gstRate } = item;
 
   // For purchases, ONLY use purchasePrice
   // For invoices (sales), ONLY use sellingPrice (throw error if missing)
@@ -69,14 +69,27 @@ export const calculateItemGST = (item, taxType, context = 'invoice', gstScheme =
 
   // Calculate taxable amount
   const itemTotal = price * quantity;
-  const discountAmount = (itemTotal * discount) / 100;
-  const taxableAmount = itemTotal - discountAmount;
+
+  // NEW: Support both discountAmount (₹) and old discount (%)
+  // Priority: discountAmount (absolute ₹) > discount (percentage for backward compatibility)
+  let finalDiscountAmount;
+  if (discountAmount > 0) {
+    // New way: absolute discount amount in rupees
+    finalDiscountAmount = discountAmount;
+  } else if (discount > 0) {
+    // Old way: percentage discount (for backward compatibility with old invoices)
+    finalDiscountAmount = (itemTotal * discount) / 100;
+  } else {
+    finalDiscountAmount = 0;
+  }
+
+  const taxableAmount = itemTotal - finalDiscountAmount;
 
   // If Composition scheme, skip GST calculation
   if (gstScheme === 'COMPOSITION') {
     return {
       ...item,
-      discountAmount,
+      discountAmount: finalDiscountAmount,
       taxableAmount,
       cgst: 0,
       sgst: 0,
@@ -91,7 +104,7 @@ export const calculateItemGST = (item, taxType, context = 'invoice', gstScheme =
 
   return {
     ...item,
-    discountAmount,
+    discountAmount: finalDiscountAmount,
     taxableAmount,
     ...gst,
     totalAmount: taxableAmount + gst.totalTax
